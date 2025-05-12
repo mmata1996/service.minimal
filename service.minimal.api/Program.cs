@@ -1,4 +1,3 @@
-
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using service.minimal.api.Models;
@@ -34,10 +33,11 @@ namespace service.minimal.api
 
             app.UseAuthorization();
 
-            var summaries = new[]
-            {
-                "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-            };
+            //Middleware para logear las peticiones
+            app.Use((context, next) => { 
+                Console.WriteLine($"Request: {context.Request.Method} {context.Request.Path}");
+                return next(context);
+            });
 
             app.MapGet("", () =>
             {
@@ -84,21 +84,29 @@ namespace service.minimal.api
             .WithDescription("Este EndPoint permite actualizar un TODO existente en la base de datos, el cual es pasado como parametro en el body de la peticion")
             .WithOpenApi();
 
-            //Dejare esto por aqui para usarlo como guia
-            app.MapGet("/weatherforecast", (HttpContext httpContext) =>
+            app.MapPost("/test", ([FromBody] TodoItem? TodoItem) =>
             {
-                var forecast = Enumerable.Range(1, 5).Select(index =>
-                    new WeatherForecast
-                    {
-                        Date = DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                        TemperatureC = Random.Shared.Next(-20, 55),
-                        Summary = summaries[Random.Shared.Next(summaries.Length)]
-                    })
-                    .ToArray();
-                return forecast;
-            })
-            .WithName("GetWeatherForecast")
-            .WithOpenApi();
+                return "Test";
+            }).AddEndpointFilter(async (context, next) =>
+            {
+                var todoItem = context.GetArgument<TodoItem>(0);
+
+                if (todoItem == null)
+                    return Results.Problem("El argumento esta nulo");
+
+                if (todoItem.Id == 0)
+                    return Results.BadRequest("El id no puede ser 0");
+
+                if (todoItem.Title is null || string.IsNullOrEmpty(todoItem.Title))
+                    return Results.BadRequest("la Title no puede nula");
+
+                if (todoItem.Description is null || string.IsNullOrEmpty(todoItem.Description))
+                    return Results.BadRequest("la descripcion no puede nula");
+
+                var result = await next(context);
+
+                return result;
+            }).WithName("Test");
 
             app.Run();
         }
